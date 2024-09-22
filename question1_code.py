@@ -6,15 +6,20 @@ import torch
 import os
 import torch_geometric as tg
 import torch_geometric.transforms as T
+import wandb
 
 from PointNetPlusPlus import PointNetPlusPlus
 from PointNetPlusPlus import train_step, test_step
 
 # defining the transformations
 pre_transform = T.NormalizeScale()
-transform = T.SamplePoints(2048)
 
-if __name__ == '__main__':
+def run_q1():
+    # Taking the variables from the config provided by wandb
+    run_config = wandb.config
+
+    transform = T.SamplePoints(run_config.sample_points)
+
     # Loading the ModelNet10 dataset from torch geometric
     train = tg.datasets.ModelNet(root='./data/Q1/train/', name='10', train=True, pre_transform=pre_transform,
                                  transform=transform)
@@ -27,7 +32,7 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
 
     # defining the parameters like batch size and number of workers
-    batch_size = 64
+    batch_size = run_config.batch_size
     num_workers = os.cpu_count()
 
     # defining the DataLoader for the train and test datasets
@@ -37,8 +42,8 @@ if __name__ == '__main__':
     # Defining the device, model and optimizer
     device = torch.device('cpu')
     model = PointNetPlusPlus(0.5, 0.5, 0.2, 0.4, 0.5).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    total_epochs = 10
+    optimizer = torch.optim.Adam(model.parameters(), lr=run_config.lr)
+    total_epochs = run_config.epochs
 
     # Training the model
     train_losses, test_losses = [], []

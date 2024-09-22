@@ -4,6 +4,7 @@ from torch_geometric.nn import MLP
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
+import wandb
 
 class SetAbstraction(torch.nn.Module):
     def __init__(self, ratio, ball_query_radius, nn):
@@ -86,6 +87,10 @@ def train_step(epoch, total_epochs, model, train_loader, optimizer, device):
     epoch_accuracy = correct / len(train_loader.dataset)
 
     print(f'Train loss: {epoch_loss:.4f}, Train accuracy: {epoch_accuracy:.4f}')
+    wandb.log({
+        "Train/Loss": epoch_loss,
+        "Train/Accuracy": epoch_accuracy
+    })
 
     return epoch_loss, epoch_accuracy
 
@@ -116,4 +121,9 @@ def test_step(epoch, total_epochs, model, test_loader, device):
     epoch_accuracy = correct / len(test_loader.dataset)
 
     print(print(f'Test loss: {epoch_loss:.4f}, Test accuracy: {epoch_accuracy:.4f}'))
+    wandb.log({
+        "Test/Loss": epoch_loss,
+        "Test/Accuracy": epoch_accuracy
+    })
+
     return epoch_loss, epoch_accuracy
