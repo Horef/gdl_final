@@ -18,19 +18,16 @@ from PointNetPlusPlus import train_step, test_step
 pre_transform = T.NormalizeScale()
 
 def run_q1():
-    wandb.init()
-
     # Parsing the arguments from the command line
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--batch_size', type=int, default=32)
-    # parser.add_argument('--epochs', type=int, default=10)
-    # parser.add_argument('--lr', type=float, default=0.001)
-    # parser.add_argument('--sample_points', type=int, default=512)
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--sample_points', type=int, default=512)
+    args = parser.parse_args()
 
     # Taking the variables from the config provided by wandb
-    # run_config = args
-    run_config = wandb.config
+    run_config = args
 
     transform = T.SamplePoints(run_config.sample_points)
 
@@ -89,3 +86,6 @@ def run_q1():
     plt.ylabel('Accuracy')
     plt.legend()
     plt.savefig('./results/accuracy.png')
+
+wandb.init()
+run_q1()
