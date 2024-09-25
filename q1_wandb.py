@@ -16,13 +16,16 @@ sweep_config={
             'values': [64, 128, 256]
         },
         'epochs': {
-            'value': 10
+            'value': 20
         },
         'lr': {
-            'values': [0.001, 0.01, 0.1]
+            'values': [0.0001, 0.001, 0.01]
         },
         'sample_points': {
             'values': [512, 1024, 2048]
+        },
+        'wandb': {
+            'value': 1
         }
     },
     'command': command

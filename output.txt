@@ -1,0 +1,69 @@
+
+Epoch 0/15
+Train loss: 1.6231, Train accuracy: 0.4257
+Test loss: 12.2315, Test accuracy: 0.1101
+
+Epoch 1/15
+Train loss: 0.7479, Train accuracy: 0.7442
+Test loss: 3.8104, Test accuracy: 0.3205
+
+Epoch 2/15
+Train loss: 0.4508, Train accuracy: 0.8421
+Test loss: 1.2611, Test accuracy: 0.6509
+
+Epoch 3/15
+Train loss: 0.2690, Train accuracy: 0.9053
+Test loss: 0.7590, Test accuracy: 0.7324
+
+Epoch 4/15
+Train loss: 0.2100, Train accuracy: 0.9266
+Test loss: 0.7040, Test accuracy: 0.7963
+
+Epoch 5/15
+Train loss: 0.1341, Train accuracy: 0.9557
+Test loss: 2.1215, Test accuracy: 0.6046
+
+Epoch 6/15
+Train loss: 0.0974, Train accuracy: 0.9674
+Test loss: 1.5839, Test accuracy: 0.7004
+
+Epoch 7/15
+Train loss: 0.0575, Train accuracy: 0.9777
+Test loss: 0.9495, Test accuracy: 0.8084
+
+Epoch 8/15
+Train loss: 0.0386, Train accuracy: 0.9880
+Test loss: 0.6323, Test accuracy: 0.8315
+
+Epoch 9/15
+Train loss: 0.0192, Train accuracy: 0.9945
+Test loss: 0.8861, Test accuracy: 0.8172
+
+Epoch 10/15
+Train loss: 0.0175, Train accuracy: 0.9962
+Test loss: 0.9740, Test accuracy: 0.8084
+
+Epoch 11/15
+Train loss: 0.0088, Train accuracy: 0.9972
+Test loss: 1.0493, Test accuracy: 0.8095
+
+Epoch 12/15
+Train loss: 0.0062, Train accuracy: 0.9987
+Test loss: 1.0334, Test accuracy: 0.8216
+
+Epoch 13/15
+Train loss: 0.0021, Train accuracy: 1.0000
+Test loss: 1.0575, Test accuracy: 0.8249
+
+Epoch 14/15
+Train loss: 0.0047, Train accuracy: 0.9985
+Test loss: 0.8608, Test accuracy: 0.8370
+Error per class: [15, 4, 1, 17, 10, 6, 58, 8, 21, 8]
+Existing cloud errors [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+Existing cloud non-errors [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+Least erred class: 2 - chair,
+Most erred class: 6 - night_stand
+Exists error on least erred class
+Exists non-error on least erred class
+Exists error on most erred class
+Exists non-error on most erred class
