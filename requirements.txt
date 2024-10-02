@@ -6,15 +6,20 @@ attrs==24.2.0
 Bottleneck @ file:///croot/bottleneck_1707864210935/work
 certifi==2024.8.30
 charset-normalizer==3.3.2
+click==8.1.7
 contourpy==1.1.1
 cycler==0.12.1
+docker-pycreds==0.4.0
 filelock==3.16.1
 fonttools==4.53.1
 frozenlist==1.4.1
 fsspec==2024.9.0
+gitdb==4.0.11
+GitPython==3.1.43
 idna==3.10
 importlib_resources==6.4.5
 Jinja2==3.1.4
+joblib==1.4.2
 kiwisolver==1.4.7
 MarkupSafe==2.1.5
 matplotlib==3.7.5
@@ -41,15 +46,25 @@ nvidia-nvtx-cu12==12.1.105
 packaging==24.1
 pandas @ file:///croot/pandas_1692289311655/work
 pillow==10.4.0
+platformdirs==4.3.6
+plotly==5.24.1
+protobuf==5.28.2
 psutil==6.0.0
 pyg-lib==0.4.0+pt24cu121
 pyparsing==3.1.4
 python-dateutil @ file:///croot/python-dateutil_1716495738603/work
 pytz @ file:///croot/pytz_1713974312559/work
+PyYAML==6.0.2
 requests==2.32.3
+scikit-learn==1.3.2
 scipy==1.10.1
+sentry-sdk==2.14.0
+setproctitle==1.3.3
 six @ file:///tmp/build/80754af9/six_1644875935023/work
+smmap==5.0.1
 sympy==1.13.3
+tenacity==9.0.0
+threadpoolctl==3.5.0
 torch==2.4.1
 torch-geometric==2.6.0
 torch_cluster==1.6.3+pt24cu121
@@ -61,5 +76,6 @@ triton==3.0.0
 typing_extensions==4.12.2
 tzdata @ file:///croot/python-tzdata_1690578112552/work
 urllib3==2.2.3
+wandb==0.18.1
 yarl==1.11.1
 zipp==3.20.2

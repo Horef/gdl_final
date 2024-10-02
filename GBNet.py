@@ -13,7 +13,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from sympy.core.tests.test_sympify import numpy
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import sklearn.metrics as metrics
+from tqdm import tqdm
 
 def cal_loss(pred, gold, smoothing=True):
     ''' Calculate cross entropy loss, apply label smoothing if needed. '''
@@ -51,7 +54,7 @@ def geometric_point_descriptor(x, k=3, idx=None):
     x = x.view(batch_size, -1, num_points)
     if idx is None:
         idx = knn(x, k=k)  # (batch_size, num_points, k)
-    device = torch.device('cuda')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
     idx_base = idx_base.type(torch.cuda.LongTensor)
@@ -61,8 +64,9 @@ def geometric_point_descriptor(x, k=3, idx=None):
 
     _, num_dims, _ = x.size()
 
-    x = x.transpose(2,
-                    1).contiguous()  # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
+    x = x.transpose(2, 1).contiguous()
+    # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims)
+    # batch_size * num_points * k + range(0, batch_size*num_points)
     neighbors = x.view(batch_size * num_points, -1)[idx, :]
     neighbors = neighbors.view(batch_size, num_points, k, num_dims)
 
@@ -89,7 +93,7 @@ def get_graph_feature(x, k=20, idx=None):
     x = x.view(batch_size, -1, num_points)
     if idx is None:
         idx = knn(x, k=k)  # (batch_size, num_points, k)
-    device = torch.device('cuda')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
     idx_base = idx_base.type(torch.cuda.LongTensor)
@@ -99,8 +103,9 @@ def get_graph_feature(x, k=20, idx=None):
 
     _, num_dims, _ = x.size()
 
-    x = x.transpose(2,
-                    1).contiguous()  # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
+    x = x.transpose(2, 1).contiguous()
+    # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims)
+    # batch_size * num_points * k + range(0, batch_size*num_points)
     feature = x.view(batch_size * num_points, -1)[idx, :]
     feature = feature.view(batch_size, num_points, k, num_dims)
     x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
@@ -116,14 +121,16 @@ class CAA_Module(nn.Module):
     def __init__(self, in_dim):
         super(CAA_Module, self).__init__()
 
-        self.bn1 = nn.BatchNorm1d(1024 // 8)
-        self.bn2 = nn.BatchNorm1d(1024 // 8)
+        point_num = 512
+
+        self.bn1 = nn.BatchNorm1d(point_num // 8)
+        self.bn2 = nn.BatchNorm1d(point_num // 8)
         self.bn3 = nn.BatchNorm1d(in_dim)
 
-        self.query_conv = nn.Sequential(nn.Conv1d(in_channels=1024, out_channels=1024 // 8, kernel_size=1, bias=False),
+        self.query_conv = nn.Sequential(nn.Conv1d(in_channels=point_num, out_channels=point_num // 8, kernel_size=1, bias=False),
                                         self.bn1,
                                         nn.ReLU())
-        self.key_conv = nn.Sequential(nn.Conv1d(in_channels=1024, out_channels=1024 // 8, kernel_size=1, bias=False),
+        self.key_conv = nn.Sequential(nn.Conv1d(in_channels=point_num, out_channels=point_num // 8, kernel_size=1, bias=False),
                                       self.bn2,
                                       nn.ReLU())
         self.value_conv = nn.Sequential(nn.Conv1d(in_channels=in_dim, out_channels=in_dim, kernel_size=1, bias=False),
@@ -381,16 +388,11 @@ class GBNet(nn.Module):
         return x
 
 
-def train(args, model, epochs, lr, device, opt, train_loader, test_loader, io):
-    model = nn.DataParallel(model)
-
-    scheduler = CosineAnnealingLR(opt, epochs, eta_min=lr)
-
+def gb_train(model, epochs, device, opt, train_loader, test_loader, points_in_cloud:int = 512):
     criterion = cal_loss
 
     best_test_acc = 0
     for epoch in range(epochs):
-        scheduler.step()
         ####################
         # Train
         ####################
@@ -399,10 +401,18 @@ def train(args, model, epochs, lr, device, opt, train_loader, test_loader, io):
         model.train()
         train_pred = []
         train_true = []
-        for data, label in train_loader:
-            data, label = data.to(device), label.to(device).squeeze()
+        for batch in tqdm(train_loader, 'Running Batches'):
+            data = batch.pos
+            label = batch.y.to(device)
+            batch_size = label.size()[0]
+            # changing the data matrix to dimensions B, N, C, where B is the batch size, N is the number of points,
+            # and C is the number of features
+            data_batches = torch.split(data, points_in_cloud, dim=0)
+            data = torch.stack(data_batches, dim=0)
+
             data = data.permute(0, 2, 1)
-            batch_size = data.size()[0]
+            data = data.to(device)
+
             opt.zero_grad()
             logits = model(data)
             loss = criterion(logits, label)
@@ -421,7 +431,7 @@ def train(args, model, epochs, lr, device, opt, train_loader, test_loader, io):
                                                                                      train_true, train_pred),
                                                                                  metrics.balanced_accuracy_score(
                                                                                      train_true, train_pred))
-        io.cprint(outstr)
+        print(outstr)
 
         ####################
         # Test
@@ -431,12 +441,21 @@ def train(args, model, epochs, lr, device, opt, train_loader, test_loader, io):
         model.eval()
         test_pred = []
         test_true = []
-        for data, label in test_loader:
-            data, label = data.to(device), label.to(device).squeeze()
+        for batch in tqdm(test_loader, desc='Running Batches'):
+            data = batch.pos
+            label = batch.y.to(device)
+            batch_size = label.size()[0]
+            # changing the data matrix to dimensions B, N, C, where B is the batch size, N is the number of points,
+            # and C is the number of features
+            data_batches = torch.split(data, points_in_cloud, dim=0)
+            data = torch.stack(data_batches, dim=0)
+
             data = data.permute(0, 2, 1)
-            batch_size = data.size()[0]
-            logits = model(data)
-            loss = criterion(logits, label)
+            data = data.to(device)
+
+            with torch.no_grad():
+                logits = model(data)
+                loss = criterion(logits, label)
             preds = logits.max(dim=1)[1]
             count += batch_size
             test_loss += loss.item() * batch_size
@@ -450,63 +469,28 @@ def train(args, model, epochs, lr, device, opt, train_loader, test_loader, io):
                                                                               test_loss * 1.0 / count,
                                                                               test_acc,
                                                                               avg_per_class_acc)
-        io.cprint(outstr)
-        if test_acc >= best_test_acc:
-            best_test_acc = test_acc
-            outstr = 'Current Best: %.6f' % best_test_acc
-            io.cprint(outstr)
-            torch.save(model.state_dict(), 'checkpoints/%s/models/model.t7' % args.exp_name)
+        print(outstr)
 
-
-def test(args, io):
-    if args.dataset == 'modelnet40':
-        test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points), num_workers=8,
-                                 batch_size=args.test_batch_size, shuffle=True, drop_last=False)
-    elif args.dataset == 'ScanObjectNN':
-        test_loader = DataLoader(ScanObjectNN(partition='test', num_points=args.num_points), num_workers=8,
-                                 batch_size=args.test_batch_size, shuffle=True, drop_last=False)
-    else:
-        raise Exception("Dataset Not supported")
-
-    device = torch.device("cuda" if args.cuda else "cpu")
-
-    # Try to load models
-    if args.model == 'pointnet':
-        if args.dataset == 'modelnet40':
-            model = PointNet(args, output_channels=40).to(device)
-        elif args.dataset == 'ScanObjectNN':
-            model = PointNet(args, output_channels=15).to(device)
-        else:
-            raise Exception("Dataset Not supported")
-    elif args.model == 'dgcnn':
-        if args.dataset == 'modelnet40':
-            model = DGCNN(args, output_channels=40).to(device)
-        elif args.dataset == 'ScanObjectNN':
-            model = DGCNN(args, output_channels=15).to(device)
-        else:
-            raise Exception("Dataset Not supported")
-    elif args.model == 'gbnet':
-        if args.dataset == 'modelnet40':
-            model = GBNet(args, output_channels=40).to(device)
-        elif args.dataset == 'ScanObjectNN':
-            model = GBNet(args, output_channels=15).to(device)
-        else:
-            raise Exception("Dataset Not supported")
-    else:
-        raise Exception("Not implemented")
-    print(str(model))
-    model = nn.DataParallel(model)
-    model.load_state_dict(torch.load(args.model_path))
+def gb_test(model, device, test_loader, points_in_cloud:int = 512):
     model = model.eval()
     test_acc = 0.0
     count = 0.0
     test_true = []
     test_pred = []
-    for data, label in test_loader:
-        data, label = data.to(device), label.to(device).squeeze()
+    for batch in tqdm(test_loader, desc='Running Batches'):
+        data = batch.pos
+        label = batch.y.to(device)
+        batch_size = label.size()[0]
+        # changing the data matrix to dimensions B, N, C, where B is the batch size, N is the number of points,
+        # and C is the number of features
+        data_batches = torch.split(data, points_in_cloud, dim=0)
+        data = torch.stack(data_batches, dim=0)
+
         data = data.permute(0, 2, 1)
-        batch_size = data.size()[0]
-        logits = model(data)
+        data = data.to(device)
+
+        with torch.no_grad():
+            logits = model(data)
         preds = logits.max(dim=1)[1]
         test_true.append(label.cpu().numpy())
         test_pred.append(preds.detach().cpu().numpy())
@@ -515,4 +499,4 @@ def test(args, io):
     test_acc = metrics.accuracy_score(test_true, test_pred)
     avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
     outstr = 'Test :: test acc: %.6f, test avg acc: %.6f' % (test_acc, avg_per_class_acc)
-    io.cprint(outstr)
+    print(outstr)
