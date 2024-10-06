@@ -30,7 +30,7 @@ parser.add_argument('--epochs', type=int, default=30)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--sample_points', type=int, default=512)
 parser.add_argument('--wandb', type=int, default=0)
-parser.add_argument('--model', type=str, default='PointNetPlusPlus')
+parser.add_argument('--model', type=str, default='GBNet')
 args = parser.parse_args()
 
 def run_q1():
@@ -58,8 +58,8 @@ def run_q1():
     test = tg.datasets.ModelNet(root='./data/Q1/test/', name='10', train=False, pre_transform=pre_transform,
                                 transform=transform)
 
-    if not os.path.exists('./results/Q1/graphs'):
-        os.makedirs('./results/Q1/graphs')
+    if not os.path.exists('results/Q1/graphs'):
+        os.makedirs('results/Q1/graphs')
 
     # defining the parameters like batch size and number of workers
     batch_size = run_config.batch_size
@@ -97,8 +97,8 @@ def run_q1():
             train_accuracies.append(train_accuracy)
             test_accuracies.append(test_accuracy)
     else:
-        gb_train(model=model, epochs=total_epochs, device=device, opt=optimizer,
-                 train_loader=train_loader, test_loader=test_loader)
+        train_losses, test_losses, train_accuracies, train_avg_accuracies, test_accuracies, test_avg_accuracies = (
+            gb_train(model=model, epochs=total_epochs, device=device, opt=optimizer, train_loader=train_loader, test_loader=test_loader))
         gb_test(model=model, device=device, test_loader=test_loader)
 
     if not args.wandb:
@@ -116,6 +116,10 @@ def run_q1():
         plt.figure(figsize=(10, 5))
         plt.plot(train_accuracies, label='Train Accuracy')
         plt.plot(test_accuracies, label='Test Accuracy')
+        if args.model != 'PointNetPlusPlus':
+            plt.plot(train_avg_accuracies, label='Train Balanced Accuracy')
+            plt.plot(test_avg_accuracies, label='Test Balanced Accuracy')
+
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.legend()

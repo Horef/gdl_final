@@ -17,6 +17,8 @@ from sympy.core.tests.test_sympify import numpy
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import sklearn.metrics as metrics
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import wandb
 
 def cal_loss(pred, gold, smoothing=True):
     ''' Calculate cross entropy loss, apply label smoothing if needed. '''
@@ -225,105 +227,6 @@ class ABEM_Module(nn.Module):
         return x, x_local
 
 
-class PointNet(nn.Module):
-    def __init__(self, args, output_channels=10):
-        super(PointNet, self).__init__()
-        self.args = args
-        self.conv1 = nn.Conv1d(3, 64, kernel_size=1, bias=False)
-        self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
-        self.conv3 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
-        self.conv4 = nn.Conv1d(64, 128, kernel_size=1, bias=False)
-        self.conv5 = nn.Conv1d(128, args.emb_dims, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(64)
-        self.bn3 = nn.BatchNorm1d(64)
-        self.bn4 = nn.BatchNorm1d(128)
-        self.bn5 = nn.BatchNorm1d(args.emb_dims)
-        self.linear1 = nn.Linear(args.emb_dims, 512, bias=False)
-        self.bn6 = nn.BatchNorm1d(512)
-        self.dp1 = nn.Dropout()
-        self.linear2 = nn.Linear(512, output_channels)
-
-    def forward(self, x):
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = F.relu(self.bn3(self.conv3(x)))
-        x = F.relu(self.bn4(self.conv4(x)))
-        x = F.relu(self.bn5(self.conv5(x)))
-        x = F.adaptive_max_pool1d(x, 1).squeeze()
-        x = F.relu(self.bn6(self.linear1(x)))
-        x = self.dp1(x)
-        x = self.linear2(x)
-        return x
-
-
-class DGCNN(nn.Module):
-    def __init__(self, k=20, emb_dims=1024, dropout=0.5, output_channels=10):
-        super(DGCNN, self).__init__()
-        self.k = k
-
-        self.bn1 = nn.BatchNorm2d(64)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.bn4 = nn.BatchNorm2d(256)
-        self.bn5 = nn.BatchNorm1d(emb_dims)
-
-        self.conv1 = nn.Sequential(nn.Conv2d(6, 64, kernel_size=1, bias=False),
-                                   self.bn1,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.conv2 = nn.Sequential(nn.Conv2d(64 * 2, 64, kernel_size=1, bias=False),
-                                   self.bn2,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.conv3 = nn.Sequential(nn.Conv2d(64 * 2, 128, kernel_size=1, bias=False),
-                                   self.bn3,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.conv4 = nn.Sequential(nn.Conv2d(128 * 2, 256, kernel_size=1, bias=False),
-                                   self.bn4,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.conv5 = nn.Sequential(nn.Conv1d(512, emb_dims, kernel_size=1, bias=False),
-                                   self.bn5,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.linear1 = nn.Linear(emb_dims * 2, 512, bias=False)
-        self.bn6 = nn.BatchNorm1d(512)
-        self.dp1 = nn.Dropout(p=dropout)
-        self.linear2 = nn.Linear(512, 256)
-        self.bn7 = nn.BatchNorm1d(256)
-        self.dp2 = nn.Dropout(p=dropout)
-        self.linear3 = nn.Linear(256, output_channels)
-
-    def forward(self, x):
-        batch_size = x.size(0)
-        x = get_graph_feature(x, k=self.k)
-        x = self.conv1(x)
-        x1 = x.max(dim=-1, keepdim=False)[0]
-
-        x = get_graph_feature(x1, k=self.k)
-        x = self.conv2(x)
-        x2 = x.max(dim=-1, keepdim=False)[0]
-
-        x = get_graph_feature(x2, k=self.k)
-        x = self.conv3(x)
-        x3 = x.max(dim=-1, keepdim=False)[0]
-
-        x = get_graph_feature(x3, k=self.k)
-        x = self.conv4(x)
-        x4 = x.max(dim=-1, keepdim=False)[0]
-
-        x = torch.cat((x1, x2, x3, x4), dim=1)
-
-        x = self.conv5(x)
-        x1 = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
-        x2 = F.adaptive_avg_pool1d(x, 1).view(batch_size, -1)
-        x = torch.cat((x1, x2), 1)
-
-        x = F.leaky_relu(self.bn6(self.linear1(x)), negative_slope=0.2)
-        x = self.dp1(x)
-        x = F.leaky_relu(self.bn7(self.linear2(x)), negative_slope=0.2)
-        x = self.dp2(x)
-        x = self.linear3(x)
-        return x
-
-
 class GBNet(nn.Module):
     def __init__(self, k=20, emb_dims=1024, dropout=0.5, output_channels=10):
         super(GBNet, self).__init__()
@@ -391,6 +294,13 @@ class GBNet(nn.Module):
 def gb_train(model, epochs, device, opt, train_loader, test_loader, points_in_cloud:int = 512):
     criterion = cal_loss
 
+    train_losses = []
+    test_losses = []
+    train_accuracies = []
+    train_avg_accuracies = []
+    test_accuracies = []
+    test_avg_accuracies = []
+
     best_test_acc = 0
     for epoch in range(epochs):
         ####################
@@ -431,6 +341,9 @@ def gb_train(model, epochs, device, opt, train_loader, test_loader, points_in_cl
                                                                                      train_true, train_pred),
                                                                                  metrics.balanced_accuracy_score(
                                                                                      train_true, train_pred))
+        train_losses.append(train_loss * 1.0 / count)
+        train_accuracies.append(metrics.accuracy_score(train_true, train_pred))
+        train_avg_accuracies.append(metrics.balanced_accuracy_score(train_true, train_pred))
         print(outstr)
 
         ####################
@@ -469,7 +382,12 @@ def gb_train(model, epochs, device, opt, train_loader, test_loader, points_in_cl
                                                                               test_loss * 1.0 / count,
                                                                               test_acc,
                                                                               avg_per_class_acc)
+        test_losses.append(test_loss * 1.0 / count)
+        test_accuracies.append(test_acc)
+        test_avg_accuracies.append(avg_per_class_acc)
         print(outstr)
+
+    return train_losses, test_losses, train_accuracies, train_avg_accuracies, test_accuracies, test_avg_accuracies
 
 def gb_test(model, device, test_loader, points_in_cloud:int = 512):
     model = model.eval()
@@ -477,6 +395,12 @@ def gb_test(model, device, test_loader, points_in_cloud:int = 512):
     count = 0.0
     test_true = []
     test_pred = []
+
+    error_per_class = [0] * 10
+    cloud_error_per_class = [None] * 10
+    error_per_class_pred = [0] * 10
+    cloud_non_error_per_class = [None] * 10
+
     for batch in tqdm(test_loader, desc='Running Batches'):
         data = batch.pos
         label = batch.y.to(device)
@@ -494,9 +418,76 @@ def gb_test(model, device, test_loader, points_in_cloud:int = 512):
         preds = logits.max(dim=1)[1]
         test_true.append(label.cpu().numpy())
         test_pred.append(preds.detach().cpu().numpy())
+
+        pred_labels = preds.cpu().numpy()
+        real_labels = label.cpu().numpy()
+
+        for i in range(len(pred_labels)):
+            if pred_labels[i] != real_labels[i]:
+                error_per_class[real_labels[i]] += 1
+                cloud_error_per_class[real_labels[i]] = batch.pos[i*points_in_cloud:(i+1)*points_in_cloud].cpu().numpy()
+                error_per_class_pred[real_labels[i]] = pred_labels[i]
+            else:
+                cloud_non_error_per_class[real_labels[i]] = batch.pos[i*points_in_cloud:(i+1)*points_in_cloud].cpu().numpy()
+
     test_true = np.concatenate(test_true)
     test_pred = np.concatenate(test_pred)
     test_acc = metrics.accuracy_score(test_true, test_pred)
     avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
     outstr = 'Test :: test acc: %.6f, test avg acc: %.6f' % (test_acc, avg_per_class_acc)
     print(outstr)
+
+    # Find the least erred class, and the most erred class
+    class_names = ['bathtub', 'bed', 'chair', 'desk', 'dresser', 'monitor', 'night_stand', 'sofa', 'table',
+                   'toilet']
+
+    print(f'Error per class: {error_per_class}')
+    existing_cloud_errors = [1 if cloud is not None else 0 for cloud in cloud_error_per_class]
+    print(f'Existing cloud errors {existing_cloud_errors}')
+    existing_cloud_non_errors = [1 if cloud is not None else 0 for cloud in cloud_non_error_per_class]
+    print(f'Existing cloud non-errors {existing_cloud_non_errors}')
+
+    least_erred_class = error_per_class.index(min(error_per_class))
+    least_erred_class_name = class_names[least_erred_class]
+
+    most_erred_class = error_per_class.index(max(error_per_class))
+    most_erred_class_name = class_names[most_erred_class]
+
+    print(f'Least erred class: {least_erred_class} - {least_erred_class_name},\n'
+          f'Most erred class: {most_erred_class} - {most_erred_class_name}')
+    # For the least erred class, visualize the point cloud of non-error and error samples
+    if cloud_error_per_class[least_erred_class] is not None:
+        print('Exists error on least erred class')
+        plot_3d_scatter(cloud_error_per_class[least_erred_class], label='least_erred_class_error',
+                        title=f'Error on the Least erred on class {least_erred_class_name}.\n'
+                              f'Mistaken for {class_names[error_per_class_pred[least_erred_class]]}')
+    if cloud_non_error_per_class[least_erred_class] is not None:
+        print('Exists non-error on least erred class')
+        plot_3d_scatter(cloud_non_error_per_class[least_erred_class], label='least_erred_class_non_error',
+                        title=f'Non-Error on the Least erred on class {least_erred_class_name}')
+
+    # For the most erred class, visualize the point cloud of non-error and error samples
+    if cloud_error_per_class[most_erred_class] is not None:
+        print('Exists error on most erred class')
+        plot_3d_scatter(cloud_error_per_class[most_erred_class], label='most_erred_class_error',
+                        title=f'Error on the Most erred on class {most_erred_class_name}.\n'
+                              f'Mistaken for {class_names[error_per_class_pred[most_erred_class]]}')
+    if cloud_non_error_per_class[most_erred_class] is not None:
+        print('Exists non-error on most erred class')
+        plot_3d_scatter(cloud_non_error_per_class[most_erred_class], label='most_erred_class_non_error',
+                        title=f'Non-Error on the Most erred on class {most_erred_class_name}')
+
+
+def plot_3d_scatter(vec, label=None, title=None, is_wandb=False):
+    '''Plot a vector data as a 3D scatter'''
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(vec[:, 0], vec[:, 1], vec[:, 2], s=80, label=label)
+    if title:
+        plt.title(title)
+    else:
+        plt.title(label)
+    if is_wandb:
+        wandb.log({f"3D Scatter {label}": wandb.Image(plt)})
+
+    plt.savefig(f'./results/Q1/graphs/{label}.png')

@@ -74,11 +74,11 @@ if __name__ == '__main__':
         val_accuracies.append(val_accuracy)
 
     if not args.wandb:
-        # Checking that the directory for graphs exists
+        # Checking that the directory for graphs_pnpp exists
         if not os.path.exists('./results/Q2/graphs'):
             os.makedirs('./results/Q2/graphs')
 
-        print("Saving the graphs")
+        print("Saving the graphs_pnpp")
 
         # Plotting the training and validation loss
         plt.figure(figsize=(10, 5))
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('./results/Q2/graphs/loss.png')
+        plt.savefig('./results/Q2/graphs_pnpp/loss.png')
 
         # Plotting the training and validation accuracies
         plt.figure(figsize=(10, 5))
@@ -96,7 +96,7 @@ if __name__ == '__main__':
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.legend()
-        plt.savefig('./results/Q2/graphs/accuracy.png')
+        plt.savefig('./results/Q2/graphs_pnpp/accuracy.png')
 
         # Making predictions on the test set
         print("Making predictions on the test set")
