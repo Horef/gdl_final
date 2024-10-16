@@ -490,4 +490,4 @@ def plot_3d_scatter(vec, label=None, title=None, is_wandb=False):
     if is_wandb:
         wandb.log({f"3D Scatter {label}": wandb.Image(plt)})
 
-    plt.savefig(f'./results/Q1/graphs/{label}.png')
+    plt.savefig(f'./results/graphs/{label}.png')

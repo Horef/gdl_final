@@ -52,14 +52,14 @@ def run_q1():
     transform = T.SamplePoints(run_config.sample_points)
 
     # Loading the ModelNet10 dataset from torch geometric
-    train = tg.datasets.ModelNet(root='./data/Q1/train/', name='10', train=True, pre_transform=pre_transform,
+    train = tg.datasets.ModelNet(root='./data/train/', name='10', train=True, pre_transform=pre_transform,
                                  transform=transform)
 
-    test = tg.datasets.ModelNet(root='./data/Q1/test/', name='10', train=False, pre_transform=pre_transform,
+    test = tg.datasets.ModelNet(root='./data/test/', name='10', train=False, pre_transform=pre_transform,
                                 transform=transform)
 
-    if not os.path.exists('results/Q1/graphs'):
-        os.makedirs('results/Q1/graphs')
+    if not os.path.exists('./results/graphs'):
+        os.makedirs('./results/graphs')
 
     # defining the parameters like batch size and number of workers
     batch_size = run_config.batch_size
@@ -110,7 +110,7 @@ def run_q1():
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('./results/Q1/graphs/loss.png')
+        plt.savefig('./results/graphs/loss.png')
 
         # Plotting the training and test accuracies
         plt.figure(figsize=(10, 5))
@@ -123,10 +123,11 @@ def run_q1():
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.legend()
-        plt.savefig('./results/Q1/graphs/accuracy.png')
+        plt.savefig('./results/graphs/accuracy.png')
 
-if args.wandb:
-    wandb.init()
-run_q1()
-if args.wandb:
-    wandb.finish()
+if __name__ == '__main__':
+    if args.wandb:
+        wandb.init()
+    run_q1()
+    if args.wandb:
+        wandb.finish()

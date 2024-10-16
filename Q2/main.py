@@ -2,7 +2,7 @@ import torch
 from torch_geometric.loader import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
-from data.Q2.CustomGraphDataset import CustomGraphDataset
+from data.CustomGraphDataset import CustomGraphDataset
 import warnings
 import wandb
 
@@ -23,7 +23,7 @@ parser.add_argument('--readout', type=str, default='sum')
 parser.add_argument('--wandb', type=int, default=0)
 args = parser.parse_args()
 
-if __name__ == '__main__':
+def run_q2():
     warnings.filterwarnings("ignore")
 
     if args.wandb:
@@ -37,9 +37,9 @@ if __name__ == '__main__':
 
     # loading the data
     print("Loading the data")
-    train_data = torch.load('data/Q2/train.pt')
-    val_data = torch.load('data/Q2/val.pt')
-    test_data = torch.load('data/Q2/test.pt')
+    train_data = torch.load('./data/train.pt')
+    val_data = torch.load('./data/val.pt')
+    test_data = torch.load('./data/test.pt')
 
     # defining the data loaders
     print("Defining the data loaders")
@@ -75,10 +75,10 @@ if __name__ == '__main__':
 
     if not args.wandb:
         # Checking that the directory for graphs_pnpp exists
-        if not os.path.exists('./results/Q2/graphs'):
-            os.makedirs('./results/Q2/graphs')
+        if not os.path.exists('./results/graphs'):
+            os.makedirs('./results/graphs')
 
-        print("Saving the graphs_pnpp")
+        print("Saving the graphs")
 
         # Plotting the training and validation loss
         plt.figure(figsize=(10, 5))
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('./results/Q2/graphs_pnpp/loss.png')
+        plt.savefig('./results/graphs/loss.png')
 
         # Plotting the training and validation accuracies
         plt.figure(figsize=(10, 5))
@@ -96,14 +96,17 @@ if __name__ == '__main__':
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.legend()
-        plt.savefig('./results/Q2/graphs_pnpp/accuracy.png')
+        plt.savefig('./results/graphs/accuracy.png')
 
         # Making predictions on the test set
         print("Making predictions on the test set")
-        test_predictions(model=model, test_loader=test_loader, device=device, file_name='results/Q2/predications.csv')
+        test_predictions(model=model, test_loader=test_loader, device=device, file_name='./results/predictions.csv')
     else:
         wandb.log({
             'Val/Min_Loss': min(val_losses),
             'Val/Max_Accuracy': max(val_accuracies)
         })
         wandb.finish()
+
+if __name__ == '__main__':
+    run_q2()
